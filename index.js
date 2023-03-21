@@ -140,17 +140,14 @@ module.exports.start = function (connections, schemaFile) {
          // we simply restart the whole process and try it again
          // we assume we will have created our own framework first, before this is fixed reliable in mongoose
          if (options.auto_reconnect !== false) {
-            if (retryCount >= 3) {
+            const { retryWaitTimes } = options;
+
+            if (retryCount >= retryWaitTimes.length) {
                log.error('[mongoose-multi] shutting down application for restart: Try to reconnect DB.');
                process.exit(0);
             }
-            const waitTimes = [
-               10_000,
-               60_000,
-               60_000 * 5,
-            ]
-            const waitTime = waitTimes[retryCount];
-            
+            const waitTime = retryWaitTimes[retryCount];
+
             setTimeout(function () {
                retryCount++;
                log.error('[mongoose-multi] retry attempt ' + retryCount);
