@@ -87,7 +87,7 @@ module.exports.start = function (connections, schemaFile) {
       startConnection(conName, url, schemaFile[conName], options);
    }
 
-   function startConnection (name, url, schemas, options) {
+   function startConnection (name, url, schemas, options, retryCount = 0) {
       // check input data
       if (!name) return log.error('[mongoose-multi] Error - no name specified for db');
       if (!url) return log.error('[mongoose-multi] Error -  no url defined for db ' + name);
@@ -135,15 +135,27 @@ module.exports.start = function (connections, schemaFile) {
       });
       dbcon.on('disconnected', function () {
          log.error(prefix + ' disconnected, ' + url);
-
+         
          // there have been several issues with reconnecting
-         // we simple restart the whole process and try it again
+         // we simply restart the whole process and try it again
          // we assume we will have created our own framework first, before this is fixed reliable in mongoose
          if (options.auto_reconnect !== false) {
-            setTimeout(function () {
-               log.error('[mongoose-multi] shutting down application for restart: Try to reconnet DB.');
+            if (retryCount >= 3) {
+               log.error('[mongoose-multi] shutting down application for restart: Try to reconnect DB.');
                process.exit(0);
-            }, 10000);
+            }
+            const waitTimes = [
+               10_000,
+               60_000,
+               60_000 * 5,
+            ]
+            const waitTime = waitTimes[retryCount];
+            
+            setTimeout(function () {
+               retryCount++;
+               log.error('[mongoose-multi] retry attempt ' + retryCount);
+               startConnection(conName, url, schemaFile[conName], options, retryCount);
+            }, waitTime);
          }
       });
    }
