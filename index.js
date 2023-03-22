@@ -9,8 +9,6 @@ mongoose.Promise = global.Promise;
 mongoose.plugin(require('./plugin/findMinOne'));
 mongoose.plugin(require('./plugin/findExactOne'));
 
-var grid = require('gridfs-stream');
-grid.mongo = mongoose.mongo;
 
 // logging
 var log;
@@ -46,14 +44,18 @@ module.exports.start = function (connections, schemaFile) {
 
             fs.readdirSync(schemaPath).forEach(function (fileName) {
                var filePath = schemaPath + '/' + fileName;
+               var words = fileName.split('.');
+               var dbName = words[0];
+               var extension = words[words.length - 1];
 
                if (fs.statSync(filePath).isDirectory()) {
                   log.critical('tried to require ' + fileName + ', but path is a folder! Aborting. Please Check your Schema folder.');
                }
 
-               var dbSchema = require(filePath);
-               var dbName = fileName.split('.js')[0];
-               schemaFile[dbName] = dbSchema;
+               if (extension === 'js') {
+                  var dbSchema = require(filePath);
+                  schemaFile[dbName] = dbSchema;
+               }
             });
          } else { //  path is the schmea file
             schemaFile = require(schemaPath);
@@ -83,53 +85,42 @@ module.exports.start = function (connections, schemaFile) {
 
    function startConnection(name, url, schemas, options, retryCount = 0) {
       // check input data
-      if (!name) {
-         log.error('[mongoose-multi] Error - no name specified for db');
-         return;
-      } else if (!url) {
-         log.error('[mongoose-multi] Error -  no url defined for db ' + name);
-         return;
-      } else if (!schemas) {
-         log.error('[mongoose-multi] Error - no schema found for db ' + name);
-         return;
-      }
+      if (!name) return log.error('[mongoose-multi] Error - no name specified for db');
+      if (!url) return log.error('[mongoose-multi] Error -  no url defined for db ' + name);
+      if (!schemas) return log.error('[mongoose-multi] Error - no schema found for db ' + name);
 
       // merge options
       options = options || {};
-      if (options.auto_reconnect !== false) {
-         options.auto_reconnect = true;
-      }
+      options.useUnifiedTopology = true;
 
       // connect database
-      connections[name] = mongoose
-         .createConnection(url, options);
+      var opts = JSON.parse(JSON.stringify(options)); delete opts.auto_reconnect; // remove "auto_reconnect" as it is no longer supported
+      connections[name] = mongoose.createConnection(url, opts);
 
       var dbcon = connections[name];
 
       // assemble the return object
 
       // return pure mongoose connection => use in other modules; use the events above
-      db[name] = {
-         mongooseConnection: dbcon
-      };
+      db[name] = { mongooseConnection: dbcon };
 
       // create connections for this database
       for (var schemaName in schemas) {
-         if (schemas[schemaName] !== 'gridfs') { // gridfs?
-            var pluralAddition = (schemaName[schemaName.length - 1] === 's') ? 'es' : 's';
-            db[name][schemaName + pluralAddition] = dbcon.model(schemaName, schemas[schemaName]);
-         }
+         var pluralAddition = (schemaName[schemaName.length - 1] === 's') ? 'es' : 's';
+         db[name][schemaName + pluralAddition] = dbcon.model(schemaName, schemas[schemaName]);
       }
 
+      var prefix = '[mongoose-multi] DB ' + name;
+
       dbcon.on('connecting', function () {
-         log.info('[mongoose-multi] DB ' + name + ' connecting to ' + url);
+         log.info(prefix + ' connecting to ' + url);
       });
       dbcon.on('error', function (error) {
          log.error('[mongoose-multi] DB ' + name + ' connection error: ', error);
          dbcon.close();
       });
       dbcon.on('connected', function () {
-         log.success('[mongoose-multi] DB ' + name + ' connected');
+         log.success(prefix + ' connected');
       });
       dbcon.on('open', function () {
          log.info('[mongoose-multi] DB ' + name + ' connection open');
@@ -143,7 +134,7 @@ module.exports.start = function (connections, schemaFile) {
          }
       });
       dbcon.on('reconnected', function () {
-         log.success('[mongoose-multi] DB ' + name + ' reconnected, ' + url);
+         log.success(prefix + ' reconnected, ' + url);
       });
       dbcon.on('disconnected', function () {
          log.error(
