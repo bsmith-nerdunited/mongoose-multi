@@ -1,46 +1,46 @@
 {
-   "name": "mongoose-multi",
-   "version": "0.4.6",
-   "description": "Create multiple Mongoose connections to severals DBs; supports also gridfs",
-   "license": "ISC",
-   "main": "index.js",
-   "maintainers": [
-      {
-         "name": "rapidfacture",
-         "email": "ff@rapidfacture.com"
-      }
-   ],
-   "author": {
-      "name": "Felix Furtmayr"
-   },
-   "dependencies": {
-      "gridfs-stream": "1.1.1",
-      "mongoose": "^5.1.1"
-   },
-   "devDependencies": {
-      "grunt": "^1.0.1",
-      "grunt-eslint": "^20.1.0"
-   },
-   "scripts": {
-      "prepublish": "npm test",
-      "test": "grunt"
-   },
-   "keywords": [
-      "mongoose",
-      "multi",
-      "multiple",
-      "database",
-      "mongo",
-      "gridfs",
-      "files",
-      "connection"
-   ],
-   "repository": {
-      "type": "git",
-      "url": "git+https://github.com/RAPIDFACTURE/mongoose-multi.git"
-   },
-   "bugs": {
-      "url": "https://github.com/rapidfacture/mongoose-multi/issues"
-   },
-   "homepage": "https://github.com/rapidfacture/mongoose-multi#readme"
+  "name": "@gofreddo/mongoose-multi",
+  "version": "0.4.9",
+  "description": "Create multiple Mongoose connections to severals DBs; supports also gridfs",
+  "license": "ISC",
+  "main": "index.js",
+  "maintainers": [
+    {
+      "name": "rapidfacture",
+      "email": "ff@rapidfacture.com"
+    }
+  ],
+  "author": {
+    "name": "Felix Furtmayr"
+  },
+  "dependencies": {
+    "gridfs-stream": "1.1.1",
+    "mongoose": "^5.10.9"
+  },
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-eslint": "^20.1.0"
+  },
+  "scripts": {
+    "prepublish": "npm test",
+    "test": "grunt"
+  },
+  "keywords": [
+    "mongoose",
+    "multi",
+    "multiple",
+    "database",
+    "mongo",
+    "gridfs",
+    "files",
+    "connection"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RAPIDFACTURE/mongoose-multi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rapidfacture/mongoose-multi/issues"
+  },
+  "homepage": "https://github.com/rapidfacture/mongoose-multi#readme"
 }

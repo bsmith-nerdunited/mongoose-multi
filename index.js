@@ -25,7 +25,6 @@ try { // try using rf-log
    };
 }
 
-
 // public vars
 module.exports.db = {};
 module.exports.schemaFile = {};
@@ -35,7 +34,6 @@ module.exports.start = function (connections, schemaFile) {
    var db = module.exports.db;
    module.exports.connections = connections;
 
-
    if (typeof schemaFile === 'string') {
       var schemaPath = schemaFile;
       schemaFile = {};
@@ -43,8 +41,8 @@ module.exports.start = function (connections, schemaFile) {
       // extract all schemas from schemafile or folder with schema files
       try {
          if (fs.statSync(schemaPath).isDirectory()) {
-         // require all files within folder,  extract db schema and sort in corresponding obj
-         // NOTE: files need to have the same name as the database
+            // require all files within folder,  extract db schema and sort in corresponding obj
+            // NOTE: files need to have the same name as the database
 
             fs.readdirSync(schemaPath).forEach(function (fileName) {
                var filePath = schemaPath + '/' + fileName;
@@ -65,9 +63,7 @@ module.exports.start = function (connections, schemaFile) {
       }
    } // else => schemaFile is already the complete schema obj
 
-
    module.exports.schemaFile = schemaFile;
-
 
    for (var conName in connections) {
       var connection = connections[conName];
@@ -85,7 +81,7 @@ module.exports.start = function (connections, schemaFile) {
       startConnection(conName, url, schemaFile[conName], options);
    }
 
-   function startConnection (name, url, schemas, options) {
+   function startConnection(name, url, schemas, options, retryCount = 0) {
       // check input data
       if (!name) {
          log.error('[mongoose-multi] Error - no name specified for db');
@@ -103,7 +99,6 @@ module.exports.start = function (connections, schemaFile) {
       if (options.auto_reconnect !== false) {
          options.auto_reconnect = true;
       }
-
 
       // connect database
       connections[name] = mongoose
@@ -131,12 +126,12 @@ module.exports.start = function (connections, schemaFile) {
       });
       dbcon.on('error', function (error) {
          log.error('[mongoose-multi] DB ' + name + ' connection error: ', error);
-         mongoose.disconnect();
+         dbcon.close();
       });
       dbcon.on('connected', function () {
          log.success('[mongoose-multi] DB ' + name + ' connected');
       });
-      dbcon.once('open', function () {
+      dbcon.on('open', function () {
          log.info('[mongoose-multi] DB ' + name + ' connection open');
 
          for (var schemaName in schemas) {
@@ -151,15 +146,28 @@ module.exports.start = function (connections, schemaFile) {
          log.success('[mongoose-multi] DB ' + name + ' reconnected, ' + url);
       });
       dbcon.on('disconnected', function () {
-         log.error('[mongoose-multi] DB ' + name + ' disconnected, ' + url);
-
+         log.error(
+            '[mongoose-multi] disconnected from DB ' + name + ' ' + url + ' retryCount: ' + retryCount
+         );
          // there have been several issues with reconnecting
-         // we simple restart the whole process and try it again
+         // we simply restart the whole process and try it again
+         // we assume we will have created our own framework first, before this is fixed reliable in mongoose
          if (options.auto_reconnect !== false) {
-            setTimeout(function () {
-               log.error('[mongoose-multi] shutting down application for restart: Try to reconnet DB.');
+            const { retryWaitTimes } = options;
+            if (retryCount >= retryWaitTimes.length) {
+               log.error(
+                  '[mongoose-multi] shutting down application for restart: Try to reconnect DB.'
+               );
                process.exit(0);
-            }, 10000);
+            }
+            const waitTime = retryWaitTimes[retryCount];
+            setTimeout(function () {
+               retryCount++;
+               log.error('[mongoose-multi] retry attempt ' + retryCount);
+               startConnection(
+                  name, url, schemas, options, retryCount
+               );
+            }, waitTime);
          }
       });
    }
