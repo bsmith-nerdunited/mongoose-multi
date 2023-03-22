@@ -23,7 +23,6 @@ try { // try using rf-log
    };
 }
 
-
 // public vars
 module.exports.db = {};
 module.exports.schemaFile = {};
@@ -33,7 +32,6 @@ module.exports.start = function (connections, schemaFile) {
    var db = module.exports.db;
    module.exports.connections = connections;
 
-
    if (typeof schemaFile === 'string') {
       var schemaPath = schemaFile;
       schemaFile = {};
@@ -41,8 +39,8 @@ module.exports.start = function (connections, schemaFile) {
       // extract all schemas from schemafile or folder with schema files
       try {
          if (fs.statSync(schemaPath).isDirectory()) {
-         // require all files within folder,  extract db schema and sort in corresponding obj
-         // NOTE: files need to have the same name as the database
+            // require all files within folder,  extract db schema and sort in corresponding obj
+            // NOTE: files need to have the same name as the database
 
             fs.readdirSync(schemaPath).forEach(function (fileName) {
                var filePath = schemaPath + '/' + fileName;
@@ -67,9 +65,7 @@ module.exports.start = function (connections, schemaFile) {
       }
    } // else => schemaFile is already the complete schema obj
 
-
    module.exports.schemaFile = schemaFile;
-
 
    for (var conName in connections) {
       var connection = connections[conName];
@@ -87,7 +83,7 @@ module.exports.start = function (connections, schemaFile) {
       startConnection(conName, url, schemaFile[conName], options);
    }
 
-   function startConnection (name, url, schemas, options, retryCount = 0) {
+   function startConnection(name, url, schemas, options, retryCount = 0) {
       // check input data
       if (!name) return log.error('[mongoose-multi] Error - no name specified for db');
       if (!url) return log.error('[mongoose-multi] Error -  no url defined for db ' + name);
@@ -96,7 +92,6 @@ module.exports.start = function (connections, schemaFile) {
       // merge options
       options = options || {};
       options.useUnifiedTopology = true;
-
 
       // connect database
       var opts = JSON.parse(JSON.stringify(options)); delete opts.auto_reconnect; // remove "auto_reconnect" as it is no longer supported
@@ -121,37 +116,48 @@ module.exports.start = function (connections, schemaFile) {
          log.info(prefix + ' connecting to ' + url);
       });
       dbcon.on('error', function (error) {
-         log.error(prefix + ' connection error: ', error);
-         mongoose.disconnect();
+         log.error('[mongoose-multi] DB ' + name + ' connection error: ', error);
+         dbcon.close();
       });
       dbcon.on('connected', function () {
          log.success(prefix + ' connected');
       });
-      dbcon.once('open', function () {
-         log.info(prefix + ' connection open');
+      dbcon.on('open', function () {
+         log.info('[mongoose-multi] DB ' + name + ' connection open');
+
+         for (var schemaName in schemas) {
+            if (schemas[schemaName] === 'gridfs') {
+               var pluralAddition = (schemaName[schemaName.length - 1] === 's') ? 'es' : 's';
+               db[name][schemaName + pluralAddition] = grid(dbcon.db);
+               log.info('[mongoose-multi] DB ' + name + ': Gridfs connected');
+            }
+         }
       });
       dbcon.on('reconnected', function () {
          log.success(prefix + ' reconnected, ' + url);
       });
       dbcon.on('disconnected', function () {
-         log.error(prefix + ' disconnected, ' + url);
-         
+         log.error(
+            '[mongoose-multi] disconnected from DB ' + name + ' ' + url + ' retryCount: ' + retryCount
+         );
          // there have been several issues with reconnecting
          // we simply restart the whole process and try it again
          // we assume we will have created our own framework first, before this is fixed reliable in mongoose
          if (options.auto_reconnect !== false) {
             const { retryWaitTimes } = options;
-
             if (retryCount >= retryWaitTimes.length) {
-               log.error('[mongoose-multi] shutting down application for restart: Try to reconnect DB.');
+               log.error(
+                  '[mongoose-multi] shutting down application for restart: Try to reconnect DB.'
+               );
                process.exit(0);
             }
             const waitTime = retryWaitTimes[retryCount];
-
             setTimeout(function () {
                retryCount++;
                log.error('[mongoose-multi] retry attempt ' + retryCount);
-               startConnection(conName, url, schemaFile[conName], options, retryCount);
+               startConnection(
+                  name, url, schemas, options, retryCount
+               );
             }, waitTime);
          }
       });
